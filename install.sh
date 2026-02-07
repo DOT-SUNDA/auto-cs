@@ -19,22 +19,41 @@ echo "✅ SETUP DOMAIN: $MY_DOMAIN"
 echo "⏳ Mengatur ulang env..."
 
 # =======================================================
-# CLEANUP & INSTALL SYSTEM
+# CLEANUP & DETEKSI OS (UNIVERSAL)
 # =======================================================
 rm -rf /root/cloudsigma_bot
 mkdir -p /root/cloudsigma_bot
 rm -f /root/auto_cs.sh
 
-echo "🔧 INSTALL SYSTEM..."
+echo "🔍 Mendeteksi Versi Ubuntu..."
+source /etc/os-release
+echo "👉 Terdeteksi: Ubuntu $VERSION_ID"
+
+echo "🔧 INSTALL SYSTEM DEPENDENCIES..."
 rm -f /etc/apt/sources.list.d/google-chrome.list
 apt-get update -y
-apt-get install -y xvfb xauth libxi6 libgconf-2-4 unzip curl gnupg python3 python3-pip
 
+# --- LOGIKA INSTALL OTOMATIS BERDASARKAN VERSI ---
+if [[ "$VERSION_ID" == "24.04" ]]; then
+    echo "📦 Mode: Ubuntu 24.04 (Modern Packages)"
+    # Install paket khusus Ubuntu 24 (t64)
+    apt-get install -y xvfb xauth libxi6 libgbm1 libnss3 unzip curl gnupg python3 python3-pip \
+    libgtk-3-0t64 libasound2t64 libatk-bridge2.0-0t64
+else
+    echo "📦 Mode: Ubuntu 20.04/22.04 (Legacy Packages)"
+    # Install paket standar lama
+    apt-get install -y xvfb xauth libxi6 libgbm1 libnss3 unzip curl gnupg python3 python3-pip \
+    libgtk-3-0 libasound2 libatk-bridge2.0-0 libgconf-2-4
+fi
+
+# Install Library Python
 pip3 uninstall -y selenium requests urllib3 webdriver-manager pyvirtualdisplay 2>/dev/null
 pip3 install selenium==4.11.2 requests==2.31.0 urllib3==2.0.7 webdriver-manager \
     --break-system-packages --ignore-installed --root-user-action=ignore --force-reinstall
 
+# Install Chrome 109
 if ! google-chrome --version | grep -q "109"; then
+    echo "⬇️ Download Chrome 109..."
     apt-get remove -y google-chrome-stable || true
     wget -q -O /tmp/chrome109.deb "https://mirror.cs.uchicago.edu/google-chrome/pool/main/g/google-chrome-stable/google-chrome-stable_109.0.5414.74-1_amd64.deb"
     dpkg -i /tmp/chrome109.deb
@@ -43,7 +62,7 @@ if ! google-chrome --version | grep -q "109"; then
 fi
 
 # =======================================================
-# PYTHON SCRIPT (LOGIC UTAMA)
+# PYTHON SCRIPT (FORMAT SESUAI REQUEST)
 # =======================================================
 cat <<EOF > /root/cloudsigma_bot/main.py
 import time, random, requests, re, logging, string
@@ -188,7 +207,6 @@ class BotPanen:
         print("\n=== FASE 2: AKTIVASI ===")
         self.setup_driver() 
         
-        # Penampung email sukses per region
         list_mnl = []
         list_crk = []
 
@@ -208,7 +226,6 @@ class BotPanen:
 
         print("\n=== KIRIM TELEGRAM (2 CHAT) ===")
 
-        # CHAT 1: MNL
         if list_mnl:
             msg_mnl = "mnl\n"
             for e in list_mnl: msg_mnl += f"{e}\n"
@@ -218,7 +235,6 @@ class BotPanen:
         
         time.sleep(1)
 
-        # CHAT 2: CRK
         if list_crk:
             msg_crk = "crk\n"
             for e in list_crk: msg_crk += f"{e}\n"
@@ -263,4 +279,5 @@ chmod 644 /etc/systemd/system/cloudsigma_bot.service
 systemctl daemon-reload
 systemctl enable cloudsigma_bot.service
 
-echo "✅ SELESAI! Silakan ketik 'reboot' untuk menjalankan."
+echo "✅ SELESAI! Script universal siap dijalankan."
+echo "👉 ketik: reboot"
